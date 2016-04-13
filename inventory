@@ -1,8 +1,5 @@
 
 [webservers]
 
- wordpress01 ansible_ssh_host=127.0.0.1 ansible_ssh_port=22
+ ip-172-31-22-83 ansible_ssh_user="administrador" ansible_sudo_pass='Teste'
 
-[databases]
-
- wordpress01 ansible_ssh_host=127.0.0.1 ansible_ssh_port=22
