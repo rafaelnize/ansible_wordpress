@@ -1,18 +1,11 @@
 
-<Directory "/sites/wordpress">
-   Options Indexes FollowSymLinks MultiViews
-   AllowOverride None
-   Require all granted
-</Directory>
-
 <VirtualHost *:80>
     ServerAdmin webmaster@wordpress.com.br
     ServerAlias www.wordpress.com.br
-    #ServerName www.wordpress.com.br
-    DocumentRoot /sites/wordpress/
+    DocumentRoot /sites/wordpress/wordpress/
     ErrorLog ${APACHE_LOG_DIR}/error.log
     CustomLog ${APACHE_LOG_DIR}/access.log combined
-    <Directory "/sites/wordpress">
+    <Directory "/sites/wordpress/wordpress">
        Options Indexes FollowSymLinks MultiViews
        AllowOverride None
        Require all granted

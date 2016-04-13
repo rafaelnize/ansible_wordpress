@@ -1,31 +1,6 @@
 
 Listen 81
 
-#Alias /munin /var/www/munin
-#<Directory /var/www/munin>
-#	Order allow,deny
-	#Allow from localhost 127.0.0.0/8  ::1
-#	Allow from all
-#	Options None
-#</Directory>
-
-#<Directory "/var/cache/munin/www">
-#    Require all granted
-#    Options FollowSymLinks SymLinksIfOwnerMatch
-#    Options none
-#</Directory>
-#<Location /munin-cgi/munin-cgi-graph>
-
-#     # Require local
-#     Require all granted
-#     Options FollowSymLinks SymLinksIfOwnerMatch
-#   <IfModule mod_fcgid.c>
-#      SetHandler fcgid-script
-#   </IfModule>
-#   <IfModule !mod_fcgid.c>
-#      SetHandler cgi-script
-#</Location>
-
 <VirtualHost *:81>
     ServerName wordpress.com.br
     ServerAdmin webmaster@wordpress.com.br

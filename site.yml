@@ -9,13 +9,37 @@
       name=apache2
       state=restarted
 
+  - name: restart crond service
+    service:
+      name: cron
+      state: restarted
+
+
+  - name: restart fail2ban
+    service:
+      name: fail2ban
+      state: restarted
+
   tasks:
 
       - name: Cria grupo teste
         group: name=teste state=present
 
+      - name: Cria grupo admin
+        group: name=admin state=present
+
+      - name: Cria usuario admin
+        user:
+          name: admin
+          comment: "Usuario Admin"
+          password: $6$dLSstns93FjE$emWsCSUO3k7vXUIyVB5sbnJmNqENTmGJByLKQHL1NrZXPHAVmY.kaQ9TTQVGV6Idd7vpixUZQJfQ05oJaJRCw.
+          group: admin
+          groups: "admin,www-data,sudo"
+          append: yes
+          state: present
+
       - name: Cria usuario teste
-        user: name=teste comment="Usuario Teste" group=teste groups=teste,sudo append=yes state=present
+        user: name=teste comment="Usuario Teste" group=teste groups=teste,www-data,sudo append=yes state=present
 
       - name: desabilita login com root
         replace: dest=/etc/ssh/sshd_config regexp='^#PermitRootLogin no\s*$' replace='\1 PermitRootLogin no'
@@ -90,6 +114,14 @@
       - name: instala wget
         action: apt name=wget state=present
 
+      - name: instala fail2ban
+        action: apt name=fail2ban state=present
+
+      - name: configura fail2ban
+        copy: src=jail.conf dest=/etc/fail2ban/jail.local owner=root group=root mode=0644
+        notify:
+          - restart fail2ban
+
       - name: habilita modulos do Apache
         command: a2enmod actions fastcgi alias
 
@@ -133,6 +165,15 @@
         service:
           name="munin-node"
           state=restarted
+
+      - name: altera permissoes nos diretorio do wordpress
+        file:
+          path="/sites/"
+          state=directory
+          owner=www-data
+          group=www-data
+          mode=0777
+          recurse=yes
 
       - name: download wordpress
         get_url: url=http://wordpress.org/latest.tar.gz dest=/sites/wordpress/latest.tar.gz
@@ -180,11 +221,15 @@
       - name: instala pacote python-mysqldb
         action: apt name=python-mysqldb state=present
 
+      - name: altera senha de root do banco
+        mysql_user: name=root password='SenhaDoRoot!!!' priv=*.*:ALL,GRANT state=present
+        ignore_errors: yes
+
       - name: cria banco
-        mysql_db: name=wordpress state=present
+        mysql_db: name=wordpress login_user=root login_password='SenhaDoRoot!!!' state=present
 
       - name: cria usuario no banco
-        mysql_user: name=wordpress password='SenhaDoBanco!!!' priv=*.*:ALL,GRANT state=present
+        mysql_user: name=wordpress password='SenhaDoBanco!!!' priv=*.*:ALL,GRANT  login_user=root login_password='SenhaDoRoot!!!' state=present
 
       - name: move arquivo conf do wordpress
         copy: src=wp-config.php dest=/sites/wordpress/wordpress/wp-config.php owner=www-data group=www-data mode=0644
@@ -198,13 +243,31 @@
       #- name: wordpress - configura password
       #  command: sed -i 's/password_here/wordpress/' /sites/wordpress/wp-config.php
 
-      - name: cria diretorios de upload
-        file: path="/sites/wordpress/wordpress/wp-content/uploads" state=directory owner=www-data mode=0644
-
       - name: altera permissoes nos arquivos do wordpress
         file:
           path="/sites/wordpress/"
+          state=directory
           owner=www-data
           group=www-data
-          mode=0644
-          recursse=yes
+          mode=0750
+          recurse=yes
+
+      - name: cria diretorios de upload
+        file: path="/sites/wordpress/wordpress/wp-content/uploads" state=directory owner=www-data mode=0644
+
+### Backup
+      - name: cria diretorio de backup
+        file: path="/backup" state=directory owner=root group=root mode=0644
+
+      - name: move script de backup
+        copy: src=dbbackup.py dest=/opt/dbbackup.py owner=root group=root mode=0644
+
+      - name: Create crontab para dbbackup.py
+        template: src=cron_dbbackup.j2 dest=/etc/cron.d/cron_dbbackup owner=root group=root mode=0644
+        notify:
+          - restart crond service
+
+      - name: Create logrotate entry para backup
+        template: src=logrotate_backup.j2 dest=/etc/logrotate.d/logrotate_backup owner=root group=root mode=0644
+        notify:
+          - restart crond service
