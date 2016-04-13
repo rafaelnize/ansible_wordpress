@@ -65,6 +65,10 @@
         command: /sbin/iptables -I INPUT -p tcp --dport https -j ACCEPT -m comment --comment "HTTPS"
         when: iptablesrules.stdout.find("HTTPS") == -1
 
+      - name: configura iptables Munin
+        command: /sbin/iptables -I INPUT -p tcp --dport ssh -j ACCEPT -m comment --comment "Munin"
+        when: iptablesrules.stdout.find("SSH") == -1
+
       - name: configura iptables SSH
         command: /sbin/iptables -I INPUT -p tcp --dport ssh -j ACCEPT -m comment --comment "SSH"
         when: iptablesrules.stdout.find("SSH") == -1
