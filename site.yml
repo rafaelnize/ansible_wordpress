@@ -166,6 +166,12 @@
           name="munin-node"
           state=restarted
 
+      - name: cria diretorio para wordpress
+        file: path=/sites/wordpress  state=directory
+         owner=www-data
+         group=www-data
+         mode=0755
+
       - name: altera permissoes nos diretorio do wordpress
         file:
           path="/sites/"
@@ -190,12 +196,6 @@
         command: a2ensite apache_munin
         notify:
           - restart apache2
-
-      - name: cria diretorio para wordpress
-        file: path=/sites/wordpress  state=directory
-         owner=www-data
-         group=www-data
-         mode=0755
 
       - name: instala Mariadb Client
         action: apt name=mariadb-client state=present
