@@ -1,0 +1,210 @@
+
+- hosts: all
+  remote_user: vagrant
+  become: true
+
+  handlers:
+  - name: restart apache2
+    service:
+      name=apache2
+      state=restarted
+
+  tasks:
+
+      - name: Cria grupo teste
+        group: name=teste state=present
+
+      - name: Cria usuario teste
+        user: name=teste comment="Usuario Teste" group=teste groups=teste,sudo append=yes state=present
+
+      - name: desabilita login com root
+        replace: dest=/etc/ssh/sshd_config regexp='^#PermitRootLogin no\s*$' replace='\1 PermitRootLogin no'
+
+      - name: desabilita login com root
+        replace: dest=/etc/ssh/sshd_config regexp='^UsePAM no\s*$' replace='\1 UsePAM no'
+
+      - name: recarrega servico ssh
+        service:
+          name: ssh
+          state: reloaded
+
+      - name: verifica se por regras existentes no iptables
+        shell: iptables -L
+        register: iptablesrules
+        always_run: yes
+
+      - name: configura iptables HTTP
+        command: /sbin/iptables -I INPUT -p tcp --dport http -j ACCEPT -m comment --comment "HTTP"
+        when: iptablesrules.stdout.find("HTTP") == -1
+
+      - name: configura iptables HTTPS
+        command: /sbin/iptables -I INPUT -p tcp --dport https -j ACCEPT -m comment --comment "HTTPS"
+        when: iptablesrules.stdout.find("HTTPS") == -1
+
+      - name: configura iptables SSH
+        command: /sbin/iptables -I INPUT -p tcp --dport ssh -j ACCEPT -m comment --comment "SSH"
+        when: iptablesrules.stdout.find("SSH") == -1
+
+      - name: iptables save
+        command: iptables-save
+
+      - name: iptables restart
+        service: name=ufw state=restarted
+
+      - name: habilita repo partner
+        apt_repository: repo='deb http://archive.canonical.com/ubuntu trusty partner' state=present
+
+      - name: habilita repo trusty-security
+        apt_repository: repo='deb http://security.ubuntu.com/ubuntu trusty-security main' state=present
+
+      - name: habilita repo trusty-security multiverse
+        apt_repository: repo='deb http://security.ubuntu.com/ubuntu trusty-security multiverse' state=present
+
+      - name: instala Apache Worker
+        action: apt name=apache2-mpm-worker state=present
+
+      - name: instala Apache Fastcgi
+        action: apt name=libapache2-mod-fastcgi state=present
+
+      - name: instala apache utils
+        action: apt name=apache2-utils state=present
+
+      - name: instala dependencia para munin
+        action: apt name=libcgi-fast-perl state=present
+
+      - name: munin-plugins-extra
+        action: apt name=munin-plugins-extra state=present
+
+      - name: instala dependencia para munin
+        action: apt name=libapache2-mod-fcgid state=present
+
+      - name: instala PHP5
+        action: apt name=php5-fpm state=present
+
+      - name: instala PHP5
+        action: apt name=php5-mysql state=present
+
+      - name: instala PHP FPM
+        action: apt name=php5-fpm state=present
+
+      - name: instala wget
+        action: apt name=wget state=present
+
+      - name: habilita modulos do Apache
+        command: a2enmod actions fastcgi alias
+
+      - name: reinicia Apache
+        service:
+          name: apache2
+          state: reloaded
+          enabled: yes
+
+      - name: exclui conf padrao apache2
+        file: path=/etc/apache2/sites-enabled/000-default.conf state=absent
+
+      - name: incluir apache2 vhost conf para wordpress
+        template:
+         src=apache_wordpress.conf.j2 dest=/etc/apache2/sites-available/apache_wordpress.conf
+         owner=root
+         group=root
+         mode=0644
+        notify:
+          - restart apache2
+
+      - name: incluir apache2 vhost conf para munin
+        template:
+          src=apache_munin.conf.j2 dest=/etc/apache2/sites-available/apache_munin.conf
+          owner=root
+          group=root
+          mode=0644
+        notify:
+          - restart apache2
+
+      - name: instala munin
+        action: apt name=munin state=present
+
+      - name: copia arquivos de configuracao do munin
+        copy: src=apache.conf dest=/etc/munin/apache.conf owner=root group=root mode=0644
+
+      - name: copia arquivos de configuracao do munin
+        copy: src=munin.conf dest=/etc/munin/munin.conf owner=root group=root mode=0644
+
+      - name: reinicia munin-node
+        service:
+          name="munin-node"
+          state=restarted
+
+      - name: download wordpress
+        get_url: url=http://wordpress.org/latest.tar.gz dest=/sites/wordpress/latest.tar.gz
+
+      - name: descompacta wordpress
+        unarchive: src=/sites/wordpress/latest.tar.gz dest=/sites/wordpress/
+
+      - name: a2ensite apache_wordpress
+        command: a2ensite apache_wordpress
+        notify:
+          - restart apache2
+
+      - name: a2ensite apache_munin
+        command: a2ensite apache_munin
+        notify:
+          - restart apache2
+
+      - name: cria diretorio para wordpress
+        file: path=/sites/wordpress  state=directory
+         owner=www-data
+         group=www-data
+         mode=0755
+
+      - name: instala Mariadb Client
+        action: apt name=mariadb-client state=present
+
+      - name: instala Mariadb Server
+        action: apt name=mariadb-common state=present
+
+      - name: instala Mariadb Server 2
+        action: apt name=mariadb-server state=present
+
+      - name: reinicia Mariadb
+        service:
+          name="mysql"
+          state=restarted
+          enabled=yes
+
+      - name: instala modulo python mysql
+        pip: name=mysqldbda
+
+      - name: instala modulo python mysql
+        pip: name=umysqldb
+
+      - name: instala pacote python-mysqldb
+        action: apt name=python-mysqldb state=present
+
+      - name: cria banco
+        mysql_db: name=wordpress state=present
+
+      - name: cria usuario no banco
+        mysql_user: name=wordpress password='SenhaDoBanco!!!' priv=*.*:ALL,GRANT state=present
+
+      - name: move arquivo conf do wordpress
+        copy: src=wp-config.php dest=/sites/wordpress/wordpress/wp-config.php owner=www-data group=www-data mode=0644
+
+      #- name: wordpress - configura database
+      #  command: sed -i 's/database_name_here/wordpress/' /sites/wordpress/wp-config.php
+
+      #- name: wordpress - configura username
+      #  command: sed -i 's/username_here/wordpress/' /sites/wordpress/wp-config.php
+
+      #- name: wordpress - configura password
+      #  command: sed -i 's/password_here/wordpress/' /sites/wordpress/wp-config.php
+
+      - name: cria diretorios de upload
+        file: path="/sites/wordpress/wordpress/wp-content/uploads" state=directory owner=www-data mode=0644
+
+      - name: altera permissoes nos arquivos do wordpress
+        file:
+          path="/sites/wordpress/"
+          owner=www-data
+          group=www-data
+          mode=0644
+          recursse=yes
