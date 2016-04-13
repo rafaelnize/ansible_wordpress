@@ -1,5 +1,4 @@
 
 [webservers]
 
- ip-172-31-22-83 ansible_ssh_user="administrador" ansible_sudo_pass='Teste'
-
+ ip-172-31-22-83 ansible_ssh_user="root" ansible_sudo_pass='teste@1234'
